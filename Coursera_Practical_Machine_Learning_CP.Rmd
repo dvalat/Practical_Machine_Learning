@@ -1,0 +1,175 @@
+---
+title: 'Practical Machine Learning: Course Project'
+author: "VALAT Didier"
+date: "21/02/2016"
+output: html_document
+---
+
+## Executive Summary
+Using devices such as *Jawbone Up*, *Nike FuelBand*, and *Fitbit* it is now possible to collect a large amount of data about personal activity relatively inexpensively. These type of devices are part of the quantified self movement - a group of enthusiasts who take measurements about themselves regularly to improve their health, to find patterns in their behavior, or because they are tech geeks. One thing that people regularly do is quantify how *much* of a particular activity they do, but they rarely quantify how well they do it. In this project, your goal will be to use data from accelerometers on the belt, forearm, arm, and dumbell of **6 participants**. They were asked to perform barbell lifts correctly and incorrectly in **5 different ways**.
+
+The data set used for this study is the Human Activity Recognition (HAR) data set, more information is available here:http://groupware.les.inf.puc-rio.br/har (see the section on the Weight Lifting Exercise Data set)
+
+The aim of this project is to predict the manner in which they did the exercice. This is the **classe** variable in the training set.
+
+## Load the data
+First, we will load the required libraries:
+
+```{r echo=TRUE, warning=FALSE, message=FALSE}
+library(caret)
+library(rattle)
+library(randomForest)
+library(rpart)
+library(rpart.plot)
+```
+
+And define the seed to make this experiment reproductible:
+```{r echo=TRUE}
+set.seed(3)
+```
+
+After that, we will load the traning and testing data:
+
+```{r echo=TRUE, results='hide'}
+pmlTrain <- read.csv("pml-training.csv", header=TRUE, na.strings=c("NA", "#DIV/0!", ""))
+pmlTest <- read.csv("pml-testing.csv", header=TRUE, na.strings=c("NA", "#DIV/0!", ""))
+```
+
+## Analyze the data
+
+I will next analyze the training and testing data sets with basic `R` commands: 
+```{r echo=TRUE, results='hide'}
+summary(pmlTrain)
+str(pmlTrain, list.len=ncol(pmlTrain))
+
+summary(pmlTest)
+str(pmlTest, list.len=ncol(pmlTest))
+```
+
+The results are not displayed for readability reasons.
+The summary shows that there is a difference in the name of the last column between the training and the test data sets. Indeed, for the training data set, it is the variable "**`r names(pmlTrain)[ncol(pmlTrain)]`**" whereas in the testing data set it is the variable "**`r names(pmlTest)[ncol(pmlTest)]`**".
+
+I can now test if the remaining columns in both data sets are the same:
+  
+```{r echo=TRUE}
+all.equal(names(pmlTrain)[1:ncol(pmlTrain) - 1], names(pmlTest)[1:ncol(pmlTrain) - 1])
+```
+
+We can conclude that the other columns are the same so the same preprocessing can be applied to the training and test data sets.
+
+## Preprocessing
+
+The previous summary also showed that the first seven columns (**`r names(pmlTest)[1:7]`**) represent variables which are not sensor data so I decide to remove them because there are not usefull for our Prediction model.
+
+```{r echo=TRUE}
+pmlTrain <- pmlTrain[,8:ncol(pmlTest)]
+pmlTest <- pmlTest[,8:ncol(pmlTest)]
+```
+
+As a final step, I saw that there are a lot of **NA** values in the data set as we could see:
+  
+```{r echo=TRUE}
+na <- c()
+for (i in 1:ncol(pmlTrain))
+{
+  na <- c(na, sum(is.na(pmlTrain[,i])))
+}
+```
+
+The proportion of NA values is very important, around **`r round(min(na[na > 0]) / nrow(pmlTrain) * 100, 2)`**% but as we can not use them for our analysis, I decided to remove them from the training data sets using the following commands:
+
+```{r echo=TRUE}
+naVal <- c()
+for(i in 1:ncol(pmlTrain))
+{
+  if (na[i] > mean(na))
+  {
+    naVal <- c(naVal, FALSE)
+  }
+  else
+  {
+    naVal <- c(naVal, TRUE)
+  }
+}
+# Remove the NA values from both training and test data sets
+pmlTrain <- pmlTrain[,naVal]
+pmlTest <- pmlTest[,naVal]
+```
+
+## Classification tree model
+
+As a first step, I will split our training data set into two partitions:
+
+- dsTrain: our training data set which will contain **60**% (**p=0.6**) of the initial training data set
+
+- dsCV: our cross validation data set which contain the other **40**% of the initial training data set
+
+```{r echo=TRUE}
+dsPart <- createDataPartition(y=pmlTrain$classe, p=0.6, list=FALSE)
+dsTrain <- pmlTrain[dsPart,]
+dsCV <- pmlTrain[-dsPart,]
+```
+
+Now, I will try to fit our classification tree model using "**classe**" as the variable to predict using all other variables of our training data set:
+
+```{r echo=TRUE}
+rpartFit <- train(classe~., data=dsTrain, method="rpart")
+rpartFit
+```
+
+I will now display the fitted final model:
+
+```{r echo=TRUE}
+rpartFit$finalModel
+```
+
+I will now plot the model:
+
+```{r echo=TRUE}
+fancyRpartPlot(rpartFit$finalModel, sub="Classification tree model")
+```
+
+Let's now estimate the accuracy of our model over the cross validation data:
+  
+```{r echo=TRUE}
+predCF <- predict(rpartFit, newdata=dsCV)
+confusionMatrix(predCF, dsCV$classe)
+```
+
+As we can see, the classification tree model accurary is low: **`r round(confusionMatrix(predCF, dsCV$classe)$overall['Accuracy']*100, digits=2)`**%.
+
+I decided to try to fit the model using Random Forest to see if the accurary will be better.
+
+## Random Forest model
+
+I will try to fit our Random Forest model using "**classe**" as the variable to predict using all other variables of our training data set:
+
+```{r echo=TRUE}
+rfFit <- randomForest(classe~., data=dsTrain)
+rfFit
+```
+
+I will now plot the Random Forest model:
+
+```{r echo=TRUE}
+plot(rfFit, main="Random Forest Model")
+```
+
+As we can see, the the Out Of Bag error for this model is low (**`r round(rfFit$err.rate[length(rfFit$err.rate[,1]),1]*100, digits=2)`**%).
+
+I will now proceed to the confusion matrix on the cross validation data to measure the model accuracy:
+  
+```{r echo=TRUE}
+predRF <- predict(rfFit, newdata=dsCV)
+confusionMatrix(predRF, dsCV$classe)
+```
+
+As we can see, the Random Forest tree model accurary is better (**`r round(confusionMatrix(predRF, dsCV$classe)$overall['Accuracy']*100, digits=2)`**%) than the one calculated with the Classification tree model (**`r round(confusionMatrix(predCF, dsCV$classe)$overall['Accuracy']*100, digits=2)`**%).
+
+## Prediction
+
+As a final step, I will the predict the **classe** variable of the initial Test data set based on the Random Forest fitted model:
+
+```{r echo=TRUE}
+predict(rfFit, newdata=pmlTest)
+```
