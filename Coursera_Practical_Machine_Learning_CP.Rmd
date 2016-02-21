@@ -131,16 +131,29 @@ I will now plot the model:
 fancyRpartPlot(rpartFit$finalModel, sub="Classification tree model")
 ```
 
-Let's now estimate the accuracy of our model over the cross validation data:
-  
+Now, I will estimate the accuracy and the sample error of our model over the training data:
+
 ```{r echo=TRUE}
-predCF <- predict(rpartFit, newdata=dsCV)
-confusionMatrix(predCF, dsCV$classe)
+predCFTrain <- predict(rpartFit, newdata=dsTrain)
+confusionMatrix(predCFTrain, dsTrain$classe)
 ```
 
-As we can see, the classification tree model accurary is low: **`r round(confusionMatrix(predCF, dsCV$classe)$overall['Accuracy']*100, digits=2)`**%.
+The accurary is: **`r round(confusionMatrix(predCFTrain, dsTrain$classe)$overall['Accuracy']*100, digits=2)`**%
 
-I decided to try to fit the model using Random Forest to see if the accurary will be better.
+The estimated sample error is: **`r 100-round(confusionMatrix(predCFTrain, dsTrain$classe)$overall['Accuracy']*100, digits=2)`**%
+
+Let's now estimate the accuracy and the out of sample error of our model over the cross validation data:
+
+```{r echo=TRUE}
+predCFCV <- predict(rpartFit, newdata=dsCV)
+confusionMatrix(predCFCV, dsCV$classe)
+```
+
+The accurary is: **`r round(confusionMatrix(predCFCV, dsCV$classe)$overall['Accuracy']*100, digits=2)`**%
+
+The out of sample error is: **`r 100-round(confusionMatrix(predCFCV, dsCV$classe)$overall['Accuracy']*100, digits=2)`**%
+
+As the both accurary is low (and out of sample is high) so I decided to try to fit the model using Random Forest to see if the accurary will be better.
 
 ## Random Forest model
 
@@ -157,7 +170,7 @@ I will now plot the Random Forest model:
 plot(rfFit, main="Random Forest Model")
 ```
 
-As we can see, the the Out Of Bag error for this model is low (**`r round(rfFit$err.rate[length(rfFit$err.rate[,1]),1]*100, digits=2)`**%).
+As we can see, the Out Of Bag error for this model is low (**`r round(rfFit$err.rate[length(rfFit$err.rate[,1]),1]*100, digits=2)`**%).
 
 I will now proceed to the confusion matrix on the cross validation data to measure the model accuracy:
   
@@ -166,12 +179,13 @@ predRF <- predict(rfFit, newdata=dsCV)
 confusionMatrix(predRF, dsCV$classe)
 ```
 
-As we can see, the Random Forest tree model accurary is better (**`r round(confusionMatrix(predRF, dsCV$classe)$overall['Accuracy']*100, digits=2)`**%) than the one calculated with the Classification tree model (**`r round(confusionMatrix(predCF, dsCV$classe)$overall['Accuracy']*100, digits=2)`**%).
+To conclude, the Random Forest tree model accurary is much better (**`r round(confusionMatrix(predRF, dsCV$classe)$overall['Accuracy']*100, digits=2)`**%) and the out of sample error is very low (**`r 100-round(confusionMatrix(predRF, dsCV$classe)$overall['Accuracy']*100, digits=2)`**%) so this model will be used for the Prediction.
 
 ## Prediction
 
 As a final step, I will the predict the **classe** variable of the initial Test data set based on the Random Forest fitted model:
 
 ```{r echo=TRUE}
-predict(rfFit, newdata=pmlTest)
+pred <- predict(rfFit, newdata=pmlTest)
+pred
 ```
