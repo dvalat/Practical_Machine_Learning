@@ -12,8 +12,10 @@ The data set used for this study is the Human Activity Recognition (HAR) data se
 
 The aim of this project is to predict the manner in which they did the exercice. This is the **classe** variable in the training set.
 
+My Github repository for this Course Project: https://github.com/dvalat/Practical_Machine_Learning
+
 ## Load the data
-First, we will load the required libraries:
+First, I will load the required libraries:
 
 ```{r echo=TRUE, warning=FALSE, message=FALSE}
 library(caret)
